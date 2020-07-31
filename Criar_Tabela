@@ -1,0 +1,709 @@
+'Class Criar_Tabela----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+'Intervalo da tabela------------------------------------------------
+Private InicioTabela As Range 'Armazena o início da tabela
+Private FimTabela As Range 'Armazena o fim da tabela
+'-------------------------------------------------------------------
+Private Base As Worksheet 'Tabela a ser trabalhada
+'-------------------------------------------------------------------
+Private Cabecalho(0 To 8) As String
+'-------------------------------------------------------------------
+Private Achado As Boolean 'Atributo para armazenar o valor lógico, se foi achado a tabela retorna true
+
+Private Visao_Pas As Boolean 'Registra se já passou pela Visão Loja ou Visão Geral
+'-------------------------------------------------------------------
+
+'Inicializa o Cabeçalho para uso-----------------------------------
+Private Sub Class_Initialize()
+
+        Set Base = ThisWorkbook.ActiveSheet 'Configura a tabela a ser trabalhada
+        
+        'Insere valores no Cabeçalho
+        Cabecalho(0) = "Nº"
+        Cabecalho(1) = "Lojas"
+        Cabecalho(2) = "Evento"
+        Cabecalho(3) = "Qtd"
+        Cabecalho(4) = "Descrição"
+        Cabecalho(5) = "Código"
+        Cabecalho(6) = "Preço"
+        Cabecalho(7) = "Data"
+        Cabecalho(8) = "Ctz"
+        
+        With Application
+            .StatusBar = "Criando Tabela...." 'Informa na barra de status
+            .ScreenUpdating = False 'Pausa a tela
+        End With
+        
+        Visao_Pas = False
+        
+        Encontrar_Tabela 'Busca a existencia de uma tabela na planilha
+End Sub
+'------------------------------------------------------------------
+
+'Retorna o valor do atributo que defina se achou a tabela
+Public Property Get Encontrado() As Boolean
+    Encontrado = Achado 'Retorna o valor lógico
+End Property
+'----------------------------------------------------
+
+'Encontrar a tabela dentro da planilha----------------------------------------------------------------------------------------------------------
+Private Sub Encontrar_Tabela()
+    On Error GoTo SemCabecalho 'Se não achar pula para o outra instância
+        Base.Cells.Find(What:="Código", LookAt:=xlWhole).Select 'Procura pelo cabeçalho
+    On Error GoTo 0 'Reseta para achar mais erros
+    
+    On Error GoTo SemDado 'Caso não tenha dado para ser inserido
+        Base.Range("J:BZ").Find("*").Select 'Procura qualquer informação diferente de vazio
+    On Error GoTo 0 'Reseta para achar mais erros
+    
+    Set InicioTabela = ActiveCell 'Reconfigura o inicio
+    
+    If Not InicioTabela.Value Like "" Then 'Caso tenha dados na tabela
+        If InicioTabela.Column > 1 Then 'Só faz se a coluna não for a primeira
+            If Not InicioTabela.Offset(0, -1).Value Like "" Then   'Se tiver dado a esquerda
+                Set InicioTabela = InicioTabela.End(xlToLeft) 'Vá até o extremo da esquerda
+            End If
+        End If
+        
+        If InicioTabela.Row > 1 Then 'Só faz se a linha não for a primeira
+            If Not InicioTabela.Offset(-1, 0) Like "" Then 'Se tiver dado acima vá até o extremo acima
+                Set InicioTabela = InicioTabela.End(xlUp)
+            End If
+        End If
+        
+        If Not InicioTabela.Offset(1, 0).Value Like "" Then 'Se a linha debaixo não estiver vazia
+            InicioTabela.End(xlDown).Select 'Seleciona a última linha com informação
+        Else
+            InicioTabela.Select 'Senão mantém a linha atual
+        End If
+        
+        Set FimTabela = Base.Cells(ActiveCell.Row, ActiveCell.EntireRow.Columns.Count).End(xlToLeft) 'Configura a última célula da onde estiver dados
+    
+        Achado = True 'Retorna que encontrou
+        
+    Else 'Se não houver deixe a variável vazia
+    
+        Set Inicio = Nothing
+        Achado = False 'Não encontrou
+        
+    End If
+    
+    Exit Sub      'Sai da função
+    
+SemCabecalho: 'Caso não tenha cabeçalho
+    On Error GoTo SemDado
+        Base.Cells.Find("*").Select 'Configura o início no intervalo da planilha inteira
+    On Error GoTo 0
+    
+    Set InicioTabela = ActiveCell
+    
+    If Not InicioTabela.Value Like "" Then 'Se houver dado neste intervalo da planilha
+        If InicioTabela.Column > 1 Then 'Só faz se a coluna não for a primeira
+            If Not InicioTabela.Offset(0, -1).Value Like "" Then   'Se tiver dado a esquerda
+                Set InicioTabela = InicioTabela.End(xlToLeft) 'Vá até o extremo da esquerda
+            End If
+        End If
+        
+        If InicioTabela.Row > 1 Then 'Só faz se a linha não for a primeira
+            If Not InicioTabela.Offset(-1, 0) Like "" Then 'Se tiver dado acima vá até o extremo acima
+                Set InicioTabela = InicioTabela.End(xlUp)
+            End If
+        End If
+        
+        If Not InicioTabela.Offset(1, 0).Value Like "" Then 'Se a linha debaixo não estiver vazia
+            InicioTabela.End(xlDown).Select 'Seleciona a última linha com informação
+        Else
+            InicioTabela.Select 'Senão mantém a linha atual
+        End If
+        
+        Set FimTabela = Base.Cells(ActiveCell.Row, ActiveCell.EntireRow.Columns.Count).End(xlToLeft) 'Configura a última célula da onde estiver dados
+        
+        Achado = True 'Achou a tabela
+    Else
+        Set InicioTabela = Nothing 'Se não houver dado, zera o início
+        Achado = False 'Retorna que não encontrou
+        
+    End If
+    
+    Exit Sub      'Sair da funçao
+    
+SemDado:
+    'Caso não tenha dados a serem inseridos apena sai da execução
+    Achado = False 'Não encontrou
+End Sub
+'--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+'Insere o Cabeçalho----------------------------------------------------------------
+Private Sub Inserir_Cabecalho()
+    Dim Item As Range 'Variável que percorre o cabeçalho
+    Dim Dif_Col As Integer 'Armazena adiferença de colunas tabela
+    
+    Application.CutCopyMode = fasle 'Desmarca a copia
+    
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Caso a tabela exista
+        Application.StatusBar = "Inserindo Cabeçalho..." 'Avisando o usuário
+    
+        If InicioTabela.Column < 10 Then 'Se a tabela estiver no caminho do cabeçalho
+            Dif_Col = FimTabela.Column - InicioTabela.Column 'Guarda a diferença de colunas
+        
+            Base.Range(InicioTabela, FimTabela).Copy 'Copia
+            
+            Base.Cells(InicioTabela.Row, FimTabela.Offset(0, 1).Column).PasteSpecial xlValue 'Cola uma coluna ao lado
+            
+            Base.Range(InicioTabela, FimTabela).ClearContents 'Limpa a origem da cópia
+            
+            'Reconfigura o início e fim da tabela
+            Set InicioTabela = Base.Cells(InicioTabela.Row, FimTabela.Column + 1)
+            Set FimTabela = Base.Cells(FimTabela.Row, InicioTabela.Column + Dif_Col)
+            
+        End If
+        
+    End If
+            
+    For Each Item In Range("A2:I2") 'Percorre o intervalo de cabeçalho
+        Item.Value = Cabecalho(Item.Column - 1) ' Insere o valor
+        Item.Borders.LineStyle = xlContinuous ' Insere borda
+        Item.HorizontalAlignment = xlCenter ' Insere Alinhamento Horizontal
+        Item.VerticalAlignment = xlCenter ' Insere Alinhamento Vertical
+        Item.Font.Size = 16 'Insere fonte tamanho 16
+        Item.Font.Bold = True 'Insere Negrito
+    Next Item
+    
+    With Base.Range("A1:I1")
+        .Merge
+        .Borders.LineStyle = xlContinuous
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Font.Size = 18
+        .Font.Bold = True
+        .Value = Mid(Application.UserName, 1, InStr(1, Application.UserName, " ", vbTextCompare) - 1) 'Retorna o apenas o nome do usuário, até o primeiro espaço
+    End With
+    
+    With Base.Range("A:A").EntireColumn 'Ajusta os númerais
+        .Font.Size = 12
+        .Font.Bold = True
+    End With
+    
+End Sub
+'----------------------------------------------------------------------------------
+
+'Insere na coluna do evento o valor de DIA ou HORTI-------------------------------------------------------------------
+Public Sub Inserir_Evento()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Verifica se há tabela
+        Application.StatusBar = "Inserindo Nome do Evento..." 'Avisando o usuário
+        
+        Dim Percorre As Range 'Variável que percorre o laço procurando não existência de evento
+        
+        Dim TemVazio As Boolean 'Variável que guarda se exite campo vazio
+        Dim Repl As Boolean 'Variável que guarda a resposta do usuário
+        Dim TemHorti As Boolean 'Verifica se tem horti
+        
+        TemVazio = False 'Zera a variável
+        TemHorti = True 'Marca como sim
+        
+        For Each Percorre In Range(InicioTabela.Offset(0, 1), FimTabela.Offset(0, -8)) 'Percorre o loop na coluna evento procurando vazio
+            If Percorre.Value Like "" Then 'Se não tiver evento
+                Percorre.Value = "@" 'Caractere coringa
+                Percorre.HorizontalAlignment = xlCenter 'Centraliza
+                
+                If Not LCase(Percorre.Offset(0, 8).Value) Like "hortifruti" Then
+                    TemHorti = False 'Caso não tenha a palavra horti em um evento vazio
+                End If
+                
+                TemVazio = True 'Marca na variável verificadora
+                
+            Else
+                Percorre.HorizontalAlignment = xlLeft 'Alinha para a esquerda
+            End If
+            
+            DoEvents
+            
+        Next Percorre
+        
+        If TemVazio Then 'Se tiver encontrado
+            
+            If TemHorti Then 'Caso tenha horti
+                Repl = Base.Cells.Replace("@", "Horti", xlWhole) 'Substitui para horti
+            Else 'Caso não
+                Repl = Base.Cells.Replace("@", "Dia", xlWhole) 'Substitui para dia
+            End If
+            
+        End If
+    End If
+End Sub
+'-------------------------------------------------------------------------------------------------------------------------
+
+'Localizar e posicionar tabela para uso-----------------------------------------------------------------------
+Public Sub Colocar_Tabela()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Se tiver tabela a ser inserida
+        Application.StatusBar = "Inserindo Tabela..." 'Avisando o usuário
+        
+        'Variáveis para localizar na tabela-----------------------------------
+        Dim Loja As Range, Evento As Range, Qtd As Range, Descricao As Range
+        Dim Preco As Range, Codigo As Range, Data As Range, Departamento As Range, Cartola As Range
+        '----------------------------------------------------------------------
+    
+        Dim Dif As Integer 'Variável que guarda o diferença de linhas da tabela
+        Dif = FimTabela.Row - InicioTabela.Row
+            
+ComCabecalho: 'Após inserir o cabeçaho refaz o processo
+        On Error GoTo SemCabecalho 'Se não achar o cabeçalho vai para outra instância
+            Base.Cells.Find(What:="Código", LookAt:=xlWhole).Select 'Busca o cabeçalho
+        On Error GoTo 0
+        
+        If ActiveCell.Offset(1, 0) <> "" Then 'Se houver dados abaixo do cabeçalho
+            Base.Cells(Base.Rows.Count, ActiveCell.Column).End(xlUp).Offset(2, -4).Select 'Seleciona o início da segunda célula livre abaixo da tabela
+        Else
+            ActiveCell.Offset(1, -4).Select 'Seleciona logo abaixo do cabeçalho
+        End If
+        
+        Set Loja = InicioTabela.Offset(0, 1)
+        Set Evento = InicioTabela.Offset(0, 3)
+        Set Qtd = InicioTabela.Offset(0, 4)
+        Set Descricao = InicioTabela.Offset(0, 7)
+        Set Codigo = InicioTabela.Offset(0, 11)
+        Set Preco = InicioTabela.Offset(0, 13)
+        Set Data = InicioTabela.Offset(0, 14)
+        Set Cartola = InicioTabela.Offset(0, 16)
+        Set Departamento = InicioTabela.Offset(0, 17)
+        
+        Set InicioTabela = ActiveCell 'Reconfigura o início da tabela
+        
+        'Copia e cola cada série do cabeçalho na sua posição--------------------
+        Base.Range(Loja, Cells(FimTabela.Row, Loja.Column)).Cut InicioTabela
+        Set InicioTabela = Loja
+        
+        Base.Range(Evento, Cells(FimTabela.Row, Evento.Column)).Cut InicioTabela.Offset(0, 1)
+        
+        Base.Range(Qtd, Cells(FimTabela.Row, Qtd.Column)).Cut InicioTabela.Offset(0, 2)
+        
+        Base.Range(Descricao, Cells(FimTabela.Row, Descricao.Column)).Cut InicioTabela.Offset(0, 3)
+        
+        Base.Range(Codigo, Cells(FimTabela.Row, Codigo.Column)).Cut InicioTabela.Offset(0, 4)
+        
+        Base.Range(Preco, Cells(FimTabela.Row, Preco.Column)).Cut InicioTabela.Offset(0, 5)
+        
+        Base.Range(Data, Cells(FimTabela.Row, Data.Column)).Cut InicioTabela.Offset(0, 6)
+        
+        Base.Range(Cartola, Cells(FimTabela.Row, Cartola.Column)).Cut InicioTabela.Offset(0, 7)
+        
+        Base.Range(Departamento, Cells(FimTabela.Row, Departamento.Offset(0, 1).Column)).Cut InicioTabela.Offset(0, 8)  'Retorna a coluna do departameto e setor
+        '---------------------------------------------------------------------------
+        
+        Set FimTabela = Base.Cells(InicioTabela.Row + Dif, InicioTabela.Column + 9) 'Reconfigura o fim
+        
+        Classificar_Tabela 'Classifica a tabela
+        
+        Exit Sub 'Para a execução
+            
+SemCabecalho:
+       Inserir_Cabecalho 'Insere o cabeçalho para uso
+       GoTo ComCabecalho 'Volta o programa
+    End If
+    
+End Sub
+'--------------------------------------------------------------------------------------------------------------------------------------------------
+
+'Classificar a tabela ------------------------------------------------------------------------------------------------
+Public Sub Classificar_Tabela()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then
+        Application.StatusBar = "Classificando..." 'Avisando o usuário
+        
+        Base.Sort.SortFields.Clear 'Limpa campos de classificação anteriores
+        
+        Base.Sort.SortFields.Add2 Key:=Range("B2").EntireColumn 'Configura o campo loja
+        
+        If Not InicioTabela.Offset(0, 8) Like "" Then 'Caso tenha algum dado na coluna ao lado da cartola
+            Base.Sort.SortFields.Add2 Key:=Range("J2").EntireColumn 'Classica Departamento
+            Base.Sort.SortFields.Add2 Key:=Range("K2").EntireColumn 'Classifica Setor
+        End If
+        
+        Base.Sort.SortFields.Add2 Key:=Range("I2").EntireColumn 'Configura o campo Cartola
+        
+        Base.Sort.SortFields.Add2 Key:=Range("E2").EntireColumn 'Configura o campo Descrição
+        
+        
+        
+        Base.Sort.SetRange Range(InicioTabela, FimTabela) 'Configura a área de ação
+        
+        Base.Sort.Apply 'Classifica
+        
+        'Alinhando todas as colunas-----------------------------------------------------------------------------------------------------------------
+        Base.Range(InicioTabela.Offset(0, -1), FimTabela.Offset(0, -8)).HorizontalAlignment = xlCenter 'Coluna A
+        
+        Base.Range(InicioTabela, FimTabela.Offset(0, -7)).HorizontalAlignment = xlLeft 'Coluna B
+        
+        Base.Range(InicioTabela.Offset(0, 1), FimTabela.Offset(0, -6)).HorizontalAlignment = xlLeft 'Coluna C
+        
+        Base.Range(InicioTabela.Offset(0, 2), FimTabela.Offset(0, -5)).HorizontalAlignment = xlCenter 'Coluna D
+        
+        Base.Range(InicioTabela.Offset(0, 3), FimTabela.Offset(0, -4)).HorizontalAlignment = xlLeft 'Coluna E
+        
+        Base.Range(InicioTabela.Offset(0, 4), FimTabela.Offset(0, -3)).HorizontalAlignment = xlCenter 'Coluna F
+        
+        Base.Range(InicioTabela.Offset(0, 5), FimTabela.Offset(0, -2)).HorizontalAlignment = xlCenter 'Coluna G
+        
+        Base.Range(InicioTabela.Offset(0, 6), FimTabela.Offset(0, -1)).HorizontalAlignment = xlLeft 'Coluna H
+        
+        Base.Range(InicioTabela.Offset(0, 7), FimTabela).HorizontalAlignment = xlCenter 'Coluna I
+        '------------------------------------------------------------------------------------------------------------------------------------------
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+
+'Ajusta as colunas da tabela----------------------------------
+Private Sub Ajustar_Colunas()
+    Base.Range("A:A").EntireColumn.AutoFit 'Número
+    Base.Range("B:B").ColumnWidth = 5.7    'Lojas
+    Base.Range("C:C").ColumnWidth = 9.57   'Evento
+    Base.Range("D:D").EntireColumn.AutoFit 'Qtd
+    Base.Range("E:E").ColumnWidth = 76.5     'Descrição
+    Base.Range("F:F").EntireColumn.AutoFit 'Preço
+    Base.Range("G:G").EntireColumn.AutoFit 'Código
+    Base.Range("H:H").ColumnWidth = 4.57   'Data
+    Base.Range("I:I").EntireColumn.AutoFit 'Setor
+End Sub
+'--------------------------------------------------------------
+
+'Remove códigos que são duplicados----------------------------------------------------------------
+Public Sub Remove_Duplicados()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Se existir tabela
+        Application.StatusBar = "Removendo Itens Duplicados..." 'Avisando o usuário
+        
+        Dim InicioLoja As Range 'Guarda o início de cada loja
+        Dim Codigo As Long, Fim As Long 'Variável de controle do primeiro loop
+        Dim Verif As Long 'Variável de controle do segundo loop
+
+        Set InicioLoja = InicioTabela 'Começa no início da tabela
+        
+        Codigo = InicioTabela.Row
+        Fim = FimTabela.Row
+        
+        Do While Codigo <= Fim 'Percorrer toda a tabela no código
+        
+            DoEvents
+        
+            If Not InicioLoja.Value Like Base.Cells(Codigo, InicioLoja.Column).Value Then 'Caso a loja seja diferente
+                Set InicioLoja = Base.Cells(Codigo, InicioLoja.Column) 'Reconfigura a loja
+            End If
+            
+            If WorksheetFunction.CountIf(Range(Cells(InicioLoja.Row, InicioTabela.Offset(0, 4).Column), Cells(Codigo, InicioTabela.Offset(0, 4).Column)), Cells(Codigo, InicioTabela.Offset(0, 4).Column).Value) > 1 Then 'Se já tiver 1 valor com aquele código
+                
+                For Verif = Codigo - 1 To InicioLoja.Row Step -1
+                    If Base.Cells(Verif, InicioTabela.Offset(0, 4).Column).Value Like Cells(Codigo, InicioTabela.Offset(0, 4).Column).Value Then
+                        Exit For
+                    End If
+                    
+                    DoEvents
+                    
+                Next Verif
+
+                
+                'Remove o com menor quantidade-----------------------------------------------------------------------
+                If Base.Cells(Verif, InicioTabela.Offset(0, 2).Column).Value > Cells(Codigo, InicioTabela.Offset(0, 2).Column).Value Then 'Verifica a quantidade de ambos
+                    'Se valor na posição verif for maior apaga o código
+                    
+                    'Verifica o Fim da tabela-------------------------------------------------------------------------------------------
+                    If Codigo = FimTabela.Row Then 'Se a linha do código fo a mesma do fim da tabela
+                        Base.Cells(Codigo, InicioTabela.Column).EntireRow.Delete xlShiftUp 'Remove a linha do código
+                        Set FimTabela = Base.Cells(Codigo, 10) 'Redefine o fim
+                    Else
+                        Base.Cells(Codigo, InicioTabela.Column).EntireRow.Delete xlShiftUp 'Remove a linha do código
+                    End If
+                    '------------------------------------------------------------------------------------------------------------------
+                
+                Else 'Se o valor na posição código for maior apaga o Verif
+                
+                    'Verifica o início da loja----------------------------------------------------------------------------
+                    If Verif = InicioLoja.Row Then
+                        'Se o início loja estiver no inicio tabela
+                        If InicioLoja.Row = InicioTabela.Row Then
+                            'Apaga e Reconfigura ambos
+                            Base.Cells(Verif, InicioTabela.Column).EntireRow.Delete xlShiftUp 'Remove a linha do verif
+                            Set InicioTabela = Base.Cells(Verif, 2) 'Reconfigura o inicio da tabela
+                            Set InicioLoja = InicioTabela  'Reconfigura o inicio da loja
+                        Else 'Senão Apaga e reconfigura apenas o início loja
+                            Base.Cells(Verif, InicioTabela.Column).EntireRow.Delete xlShiftUp 'Remove a linha do verif
+                            Set InicioLoja = Base.Cells(Verif, 2) 'Reconfigura o inicio da tabela
+                        End If
+                         
+                    Else
+                        Base.Cells(Verif, InicioTabela.Column).EntireRow.Delete xlShiftUp 'Remove a linha do verif
+                    End If
+                    '----------------------------------------------------------------------------------------------------
+                End If
+            '-------------------------------------------------------------------------------------------------------
+                
+                Codigo = Codigo - 1 'Volta 1 por ter apagado
+                Fim = Fim - 1 'Diminui o fim
+                
+            End If
+            
+            Codigo = Codigo + 1 'Segue para o próximo
+        Loop
+        
+    End If
+End Sub
+'-------------------------------------------------------------------------------------------------
+
+'Somar os extras na quantidade------------------------------------------------------------------------------------------
+Public Sub Extras()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Se existir tabela
+        Application.StatusBar = "Verificando Quantidade Extra..." 'Avisando o usuário
+        
+        Dim QtdExtra As Range 'Variável que guarda  a primeira linha da qunatidade extra
+        Dim Hoje As Date, DataProd As Date 'Data de hoje
+    
+        Hoje = Date
+         
+        For Each QtdExtra In Range(Cells(InicioTabela.Row, InicioTabela.Offset(0, 8).Column), Cells(FimTabela.Row, InicioTabela.Offset(0, 8).Column)) 'Percorre a coluna da quantidade extra
+            If Not QtdExtra.Value Like "" Then 'Se tiver quantidade extra
+            
+                DataProd = DateValue(Replace(QtdExtra.Offset(0, 6).Value, ".", "/")) 'Recebe a data da vigência do produto
+                
+                If Hoje < DataProd Then 'Se a vigência não começou ainda
+                    QtdExtra.Offset(0, -4).Value = QtdExtra.Offset(0, -4).Value + QtdExtra.Value 'soma
+                Else 'Senão
+                    QtdExtra.Offset(0, -4).Value = QtdExtra.Value 'Substitui
+                End If
+                
+                QtdExtra.Value = "" 'Limpa o espaço
+                
+            End If
+            
+            DoEvents
+            
+        Next QtdExtra
+    End If
+End Sub
+'--------------------------------------------------------------------------------------------------------------------------
+
+'Insere espaçamentos entre as lojas para separálas---------------------------------------------
+Private Sub Espacamento()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Se existir tabela
+        Application.StatusBar = "Adicionando Espaçamento entre Lojas..." 'Avisando o usuário
+        
+        Dim Prox As Range 'Percorre a coluna da loja
+               
+        Set Prox = InicioTabela.Offset(1, 0) 'Configura 1 linha para baixo
+        
+        While Not Prox.Value2 Like "" 'Percorre até o fim dela
+            If Not Prox.Value2 Like Prox.Offset(-1, 0).Value2 Then 'Se os valores forem diferentes
+                Prox.EntireRow.Insert xlUp 'Adiciona um espaço vazio entre as lojas
+            End If
+            
+            Set Prox = Prox.Offset(1, 0) 'Passa para o próximo
+            
+            DoEvents
+            
+        Wend
+    End If
+End Sub
+'--------------------------------------------------------------------------------------------
+
+'Adiciona a fórmula de contagem-------------------------------------------------------------------------------------------------------------
+Private Sub Numerar()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then
+        Application.StatusBar = "Adicionando Numeração..." 'Avisando o usuário
+        
+        Dim Num As Range 'Percorre a coluna do número
+        
+        For Each Num In Range("A3", Cells(FimTabela.Row, 1))
+            Num.FormulaLocal = "=SE(INDIRETO(""B""&LIN())<>"""";SE(ÉNÚM(INDIRETO(""A""&(LIN()-1)));INDIRETO(""A""&(LIN()-1))+1;1);"""")" 'Adiciona a Fórmula
+            
+            If Not Num.Offset(0, 1).Value Like "" Then 'Se tiver dado ao lado
+                Num.Borders.LineStyle = xlContinuous 'Adiciona borda
+            End If
+            
+            Formatar_Preco Num.Offset(0, 6) 'Passa a célula do preço
+            
+            DoEvents
+            
+        Next Num
+
+    End If
+End Sub
+'-----------------------------------------------------------------------------------------------------------------------------------------
+
+'Cria a Formatação condicional na tabela-----------------------------------------------------------------------------------
+Private Sub Formatacao_Condicional()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then
+        Application.StatusBar = "Adicionando Bordas..." 'Avisando o usuário
+        
+        Dim Linha As Range, Borda As Range
+        
+        For Each Linha In Base.Range(InicioTabela, Cells(FimTabela.Row, InicioTabela.Column)) 'Percorre a coluna de lojas
+            If Not Linha.Value Like "" Then 'Se tiver algum dado
+                
+                For Each Borda In Range(Linha, Cells(Linha.Row, FimTabela.Column - 2)) 'Percorre a linha onde parou menos o que será excluído
+                
+                    Borda.Borders.LineStyle = xlContinuous 'insere borda
+                    
+                    If Cells(Linha.Row, InicioTabela.Offset(0, 2).Column).Value Like "" Or Cells(Linha.Row, InicioTabela.Offset(0, 2).Column).Value Like " " Then 'Se não tiver item
+                        Borda.Interior.Color = "15132391" 'Adiciona a cor cinza
+                        Cells(Linha.Row, InicioTabela.Offset(0, 2).Column).Value = " " 'Põe espaço
+                    End If
+                    
+                    DoEvents
+                    
+                Next Borda
+                
+            End If
+        Next
+    End If
+    
+End Sub
+'--------------------------------------------------------------------------------------------------------------------------
+
+Public Sub Visao_Geral()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Verifica se tem tabela
+        If Not Visao_Pas Then
+            Application.StatusBar = "Procurando por Visão Extra..." 'Avisando o usuário
+            
+            Dim Desc As Range, InicioGeral As Range, FimGeral As Range 'Variáveis de controle
+            Dim Achou As Boolean 'Variável de verificação
+            
+            Achou = False 'Zera a variável
+            
+            For Each Desc In Range(InicioTabela.Offset(0, 5), Cells(FimTabela.Row, InicioTabela.Offset(0, 5).Column)) 'Percorre a data
+                If InStr(1, Desc.Value, ".", vbTextCompare) <> 3 And InStr(4, Desc.Value, ".", vbTextCompare) <> 6 Then 'Se não houver "." e for maior que 10 de tamanho
+                    Set InicioGeral = Desc 'Seleciona na coluna
+                    Achou = True 'Informa ter achado
+                    Exit For 'Interrompe o loop
+                End If
+                
+            Next Desc
+            
+            If Achou Then
+                Dim QtdExtra As Range
+                
+                If Not InicioGeral.Offset(1, 0).Value Like "" Then 'Verifica se tem mais de 1
+                    InicioGeral.End(xlDown).Select 'Vai até o fim e seleciona
+                Else
+                    InicioGeral.Select 'Senão seleciona o que estiver
+                End If
+                
+                Set FimGeral = Base.Cells(ActiveCell.Row, Base.Columns.Count).End(xlToLeft) 'Configura o fim
+            
+                For Each QtdExtra In Range(InicioGeral.Offset(0, 1), Cells(FimGeral.Row, InicioGeral.Offset(0, 1).Column))
+                    QtdExtra.Value = ""
+                    
+                    DoEvents
+                    
+                Next QtdExtra
+                
+                Base.Range(InicioGeral, FimGeral).Cut InicioGeral.Offset(0, 2) 'Corta
+                
+                Set InicioGeral = InicioGeral.Offset(0, 8) 'Reconfigura as variáveis
+                
+                Base.Range(Cells(InicioGeral.Row, InicioGeral.Offset(0, -1).Column), Cells(FimGeral.Row, InicioGeral.Offset(0, -1).Column)).Cut InicioGeral.Offset(0, -4) 'Corta e cola
+                
+                Base.Range(InicioGeral, FimGeral).Cut InicioGeral.Offset(0, -1) 'Corta e cola
+                
+                Set InicioGeral = Nothing 'Limpa memória
+                Set FimGeral = Nothing 'Limpa memória
+                
+                Visao_Pas = True
+                
+            End If
+            
+            Set Desc = Nothing 'Limpa memória
+        End If
+    End If
+End Sub
+
+Public Sub Visao_Loja()
+    If Not InicioTabela Is Nothing And Not FimTabela Is Nothing Then 'Verifica se tem tabela
+        If Not Visao_Pas Then
+            Dim Qtd As Range, InicioVisao As Range, FimVisao As Range 'Variáveis de controle
+            Dim Visao As Boolean 'Variável de verificação
+            
+            Visao = False 'Zera a variável
+            
+            For Each Qtd In Range(InicioTabela.Offset(0, 4), Cells(FimTabela.Row, InicioTabela.Offset(0, 4).Column)) 'Percorre a linha de quantidade
+                If Qtd.Value Like "" Then 'Se achar vazio
+                    Visao = True 'Informa ter achado
+                    Set InicioVisao = Qtd.Offset(0, 1) 'Seleciona a coluna a direita
+                    Exit For 'Interrompe o loop
+                End If
+                
+                DoEvents
+                
+            Next Qtd
+            
+            If Visao Then 'Caso tenha achado
+                If Not InicioVisao.Offset(1, 0).Value Like "" Then 'Verifica se tem mais de 1
+                    InicioVisao.End(xlDown).Select 'Vai até o fim e seleciona
+                Else
+                    InicioVisao.Select 'Senão seleciona o que estiver
+                End If
+                
+                Set FimVisao = Base.Cells(ActiveCell.Row, Base.Columns.Count).End(xlToLeft) 'Configura o fim
+                
+                'Recorta na seção da descrição---------------------------------------------------------------
+                Base.Range(InicioVisao, FimVisao).Cut InicioVisao.Offset(0, 2) 'Recorta a seção da tabela
+                
+                'Reconfigura as variáveis-----------------
+                Set InicioVisao = InicioVisao.Offset(0, 1)
+                '-----------------------------------------
+                '--------------------------------------------------------------------------------------------
+                
+                'Reconta na seção do código----------------------------------------------------------------
+                Base.Range(InicioVisao, FimVisao).Cut InicioVisao.Offset(0, 3) 'Recorta a segunda vez
+                
+                'Reconfigura as variáveis-----------------
+                Set InicioVisao = InicioVisao.Offset(0, 1)
+                '-----------------------------------------
+                '------------------------------------------------------------------------------------------
+                
+                'Recorte final---------------------------------------------
+                Base.Range(InicioVisao, FimVisao).Cut InicioVisao.Offset(0, 2)
+                '-----------------------------------------------------
+                'Zera as variáveis--------------------------
+                Set InicioVisao = Nothing
+                Set FimVisao = Nothing
+                
+                Visao_Pas = True
+                
+            End If
+            
+            Set Qtd = Nothing 'Zera a variável que percorre
+        End If
+    End If
+End Sub
+
+'Adiciona a formatação a coluna de preços--------------------------
+Private Sub Formatar_Preco(ByRef Valor As Range)
+    If Not Valor.Value Like "" Then
+        Valor.NumberFormat = "General"
+    End If
+End Sub
+'-------------------------------------------------------------------
+
+'Termina o programa----------------------------------------------------------
+Private Sub Class_Terminate()
+    
+    Espacamento 'Ao finalizar chama o espaçamento entre lojas
+    
+    Formatacao_Condicional 'Chama a função Formatação Condicional
+    
+    Numerar 'Chama a função numerar
+    
+    Ajustar_Colunas
+    
+    Base.Range(Cells(1, 10), Cells(1, Base.Columns.Count)).EntireColumn.Clear 'Limpa as colunas não usadas
+    Base.Range(Cells(1, 10), Cells(1, Base.Columns.Count)).EntireColumn.ClearFormats
+    
+    Set Base = Nothing 'Limpa a variável da tabela
+    
+    Set InicioTabela = Nothing
+    Set FimTabela = Nothing
+    
+    For Each Valor In Cabecalho 'Limpa o cabeçalho
+        Valor = ""
+    Next
+    
+    With Application
+            .StatusBar = "" 'Limpa a barra de status
+            .ScreenUpdating = True 'Despausa a tela
+    End With
+End Sub
