@@ -1,0 +1,216 @@
+Private Salvo As Boolean
+
+Private Sub Workbook_BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)
+    If LCase(ThisWorkbook.Name) Like "*modelo*" Then 'Verifica o nome da pasta
+        
+        If Not Salvo Then 'Verifica se já foi salvo
+            
+            Dim Plan As Worksheet
+            Dim Cel As Range
+            Dim I As Integer 'Index da planilha
+    
+            For I = 1 To ThisWorkbook.Sheets.Count 'Percorre as tabelas
+    
+                Set Plan = ThisWorkbook.Sheets(I) 'Planilha a ser tratada
+                
+                Set Cel = Plan.Cells.Find("*") 'Procura por algum dado
+    
+                If Not Cel Is Nothing Then 'Caso tenha achado
+                    Dim Data As String 'Variável que guarda a data do evento
+                    Dim Evento As String 'Variável que guarda o evento vigênte
+                    Dim EventoArq As String 'Variável que armazena o nome do diretório do evento
+                    Dim Default As String 'Variável que guarda o valor default de sugestão para o usuário
+                    Dim Nome_User As String 'Variável que guarda o nome do usuário
+                    Dim Resposta As String 'Variável que armazena o nome dado pelo usuário
+                    Dim NomeArq As String 'Variável que gurada o nome do arquivo para salvar
+                    Dim Caminho As String 'Variável que guarda o caminho de salvamento
+    
+                    Dim Pos As Integer 'Recebe a posição do espaço
+    
+                    Dim TemEvento As Boolean, TemUser As Boolean, TemArq As Boolean 'Variáveis para pasta
+    
+                    Dim Hoje As Date, DataVig As Variant
+    
+    
+Inicio:
+                    Evento = Plan.Range("C3").Value 'Pega o nome do evento
+    
+                    'Seleciona o Evento para informar como Default para o Usuário-----------------------------------------------------------
+                    If Not Evento Like "" Then 'Se o nome não for vazio
+    
+                        Pos = InStr(1, Evento, " ", vbTextCompare) 'Procura por espaços no texto
+    
+                        If Pos > 0 Then 'Se possuir espaço
+    
+                            Evento = Mid(Evento, 1, Pos - 1) 'Pega até o espaço
+    
+                        End If
+    
+                        Evento = UCase(Mid(Evento, 1, 1)) & LCase(Mid(Evento, 2, Len(Evento) - 1)) 'Capitaliza o texto
+    
+                    Else 'Se o nome for vazio
+    
+                        Evento = "Evento" 'Configura um nome padrão
+    
+                    End If
+                    '------------------------------------------------------------------------------------------------------------------------
+    
+                    Default = Evento 'Pega o default
+    
+                    'Pega o nome do evento que o usuário definiu-------------------------------------------------------------------------------
+                    
+                    Resposta = InputBox("Favor Digite o Nome do Arquivo", "Salvar Arquivo", Default) 'Recebe o nome do arquivo do usuário
+    
+                    If Resposta Like "" Then 'Informa nome inválido
+    
+                        MsgBox "Nenhum Nome de Arquivo foi Digitado!", vbOKOnly, "Nome Errado"
+                        Cancel = True 'Cancela o processo
+                        Exit Sub 'Sai da execução
+                    End If
+                    
+                    '----------------------------------------------------------------------------------------------------------------------------
+    
+                    Evento = Resposta 'Recebo a resposta do usuário
+                    
+                    Resposta = "" 'Zera a variável
+    
+                    Pos = InStr(1, Evento, " ", vbTextCompare) 'Recebe a posição do espaço do evento
+    
+                    If Pos > 0 Then 'Se tiver espaço no texto
+    
+                        EventoArq = Mid(Evento, 1, Pos - 1) 'Recebe o valor sem espaço
+    
+                    Else 'Senão
+    
+                        EventoArq = Evento 'Recebe apenas o evento
+    
+                    End If
+    
+                    EventoArq = UCase(Mid(EventoArq, 1, 1)) & LCase(Mid(EventoArq, 2, Len(EventoArq) - 1)) 'Capitaliza o texto
+    
+                    Hoje = Date 'Data de hoje
+                    DataVig = DataMaior 'Data da vigência
+    
+                    'Pegando a Data-----------------------------------------------------------------------------------------------------------------------------
+                    If Not DataVig Like "" And DataVig > Hoje Then
+    
+                        Data = Replace(DateSerial(Year(DataVig), Month(DataVig), Day(DataVig)), "/", ".") 'configura a data de vigência com ponto "."
+    
+                    Else
+    
+                        Data = Replace(DateSerial(Year(Hoje), Month(Hoje), Day(Hoje)), "/", ".") 'Senão configura a data de hoje com ponto "."
+    
+                    End If
+                    '-------------------------------------------------------------------------------------------------------------------------------------------
+    
+                    'Pegando o nome do usuário------------------------------------------------------------------------------
+    
+                    Nome_User = Mid(Application.UserName, 1, InStr(1, Application.UserName, " ", vbTextCompare) - 1) 'Armazena apenas o nome antes do espaço
+
+                    '--------------------------------------------------------------------------------------------------------
+    
+                    Caminho = ThisWorkbook.Path & "\" 'Pega a o endereço interno de onde o arquivo está
+    
+                    NomeArq = Dir(Caminho, vbDirectory) 'Recebe o caminho de início da pasta
+    
+                    Do Until NomeArq Like "" 'Percorre todos os itens da pasta
+                        If LCase(NomeArq) Like LCase(Nome_User) Then 'Se tiver o arquivo com o nome do usuário
+                            TemUser = True 'Marca
+                            Exit Do
+                        End If
+    
+                        NomeArq = Dir() 'Vai para o próximo item na pasta
+    
+                    Loop
+    
+                    Caminho = Caminho & Nome_User
+                    
+                    If Not TemUser Then 'Caso não tenha o arquivo com o nome do usuário
+                        MkDir Caminho 'Cria o arquivo
+                    End If
+    
+                    Caminho = Caminho & "\" 'Recebe o novo caminho
+    
+                    NomeArq = Dir(Caminho, vbDirectory) 'Procura dentro da pasta do usuário
+    
+                    Do Until NomeArq Like "" 'Percorre a pasta com o nome do usuário
+                        If LCase(NomeArq) Like LCase(EventoArq) Then 'Se achar o evento
+                            TemEvento = True 'Marca
+                            Exit Do
+                        End If
+    
+                        NomeArq = Dir() 'Passa para o próximo Item na pasta
+    
+                    Loop
+    
+                    
+                    Caminho = Caminho & EventoArq
+                    
+                    If Not TemEvento Then 'Se não achou
+                        MkDir Caminho 'Cria a pasta com o evento
+                    End If
+    
+                    Caminho = Caminho & "\" 'Configura o novo caminho
+    
+                    NomeArq = Dir(Caminho, vbDirectory)
+    
+                    Do Until NomeArq Like ""
+                        If LCase(NomeArq) Like LCase(Evento & " " & Data & " - " & Nome_User & ".xlsm") Then
+                            TemArq = True
+                            Exit Do
+                        End If
+    
+                        NomeArq = Dir()
+                    Loop
+    
+                    If Not TemArq Then
+    
+                        NomeArq = Caminho & Evento & " " & Data & " - " & Nome_User & ".xlsm" 'Recebe o nome do arquivo
+    
+                        Salvo = True 'Marcar com salvo
+                        
+                        ThisWorkbook.SaveCopyAs NomeArq 'Salva uma cópia com o nome
+    
+                        If ThisWorkbook.Sheets.Count > 1 Then 'Se tiver mais de uma Planilha
+                            Dim Planilha As Integer
+    
+                            Application.DisplayAlerts = False
+    
+                            For Planilha = ThisWorkbook.Sheets.Count To 2 Step -1
+                                ThisWorkbook.Sheets(Planilha).Delete 'Deleta as planilhas
+                            Next Planilha
+    
+                            Set Plan = ThisWorkbook.Sheets(1)
+    
+                       End If
+    
+                        Plan.Name = "Evento" 'Renomeia a planilha
+    
+                        Application.DisplayAlerts = True
+    
+                        Plan.Cells.Delete 'Limpa os dados do arquivo base
+    
+                        Plan.Cells.ClearFormats 'Limpa os formatos
+    
+                        Plan.Range("A1").Select  'Seleciona o início
+                        
+                        ThisWorkbook.Save 'Salva o arquivo base
+    
+                        Workbooks.Open NomeArq 'Abre o arquivo salvo
+                        
+                        Salvo = False 'Reseta a variável
+                        
+                        ThisWorkbook.Close 'Fecha o arquivo base
+    
+                    Else
+                        MsgBox "Nome do Arquivo já Existente, Favor Escolher Outro!", vbOKOnly, "Erro no Nome do Arquivo"
+                        GoTo Inicio
+                    End If
+    
+                End If
+            
+            Next I
+    
+        End If
+    End If
+End Sub
