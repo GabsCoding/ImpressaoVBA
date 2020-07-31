@@ -1,0 +1,320 @@
+'Class Verificar_Tabela
+'Declaração------------------------------------------------------------
+Private PastaRef As Workbook 'Pasta de referência
+Private PlanRef As Worksheet 'Planilha de referência
+
+Private Tabela As ListObject 'Tabela dos dados
+Private Plan As Worksheet 'Planilha atual
+'-----------------------------------------------------------------------
+
+'Verifica Se houve ocorrência---------------
+Private TemHor As Boolean
+Private TemVer As Boolean
+Private TemMesc As Boolean
+Private TemMania As Boolean
+'-------------------------------------------
+
+'Inicialização----------------------------------------------------------------------------------------------
+Private Sub Class_Initialize()
+    Set Plan = ThisWorkbook.ActiveSheet 'Configura a plan atual
+    
+    On Error GoTo SemPasta
+        Set PastaRef = GetObject("G:\Comercial\Trade Marketing\Ramos\Referência\Lojas GU e Carnes.xlsm") 'Acessa a pasta de referência
+    On Error GoTo SemPlanilha
+        Set PlanRef = PastaRef.Sheets(1) 'Planilha 1
+    On Error GoTo 0
+    
+    Set Tabela = PlanRef.ListObjects("tblRef") 'Pega a tabela de referência
+    
+    With Application
+        .StatusBar = "Verificando..." 'Informa na barra de status
+        .ScreenUpdating = False 'Pausa a tela
+    End With
+    
+    Exit Sub 'Sai da execução
+SemPlanilha:
+    PastaRef.Close False
+    Set PlanRef = Nothing
+SemPasta:
+    Set PastaRef = Nothing
+    
+    Application.StatusBar = ""
+End Sub
+'--------------------------------------------------------------------------------------------------------------
+
+'Identifica carnes---------------------------------------------------------------------------------------------
+Private Sub Carnes(ByRef Linha As ListRow, ByVal I As Integer)
+    Select Case Intersect(Tabela.ListColumns("Carnes").Range, Linha.Range).Value2 'Se na coluna da carnes da loja verificada
+        Case "V" 'For Vertical
+            Plan.Range(Cells(I, 2), Cells(I, 9)).Interior.ColorIndex = 19 'Amarelo Claro
+            TemVer = True
+        Case "H" 'For Horizontal
+            Plan.Range(Cells(I, 2), Cells(I, 9)).Interior.ColorIndex = 45 'Laranja Claro
+            TemHor = True
+        Case "M" 'For Mesclado
+            Plan.Range(Cells(I, 2), Cells(I, 9)).Interior.ColorIndex = 35 'Verde Claro
+            TemMesc = True
+    End Select
+End Sub
+'---------------------------------------------------------------------------------------------------------
+
+'Marca GU's-----------------------------------------------------------------------------
+Private Sub GU(ByVal Linha As Integer)
+    Plan.Range(Cells(Linha, 2), Cells(Linha, 9)).Interior.ColorIndex = 24 'Azul Claro
+    TemMania = True
+End Sub
+'-----------------------------------------------------------------------------------------
+
+'Verifica as Lojas---------------------------------------------------------------------------------------
+Public Sub Verificar()
+    If Not Tabela Is Nothing Then 'Caso haja tabela
+        Dim Linhas As ListRows 'Linhas da tabela
+        Dim Linha As ListRow 'Linha atual percorrida
+        
+        Dim Loja As Variant 'Loja verificada
+        
+        Dim Cel As Range 'Célula da plan atual
+        
+        Dim I As Integer 'Perocrre todos produtos da loja
+        Dim VerificadorGU As Integer 'Verifica quantos itens GU's tem
+        Dim Inicio As Integer 'Inicio da loja (linha)
+        Dim Fim As Integer 'Fim da loja (linha)
+        Dim Prod As Integer 'Percorre os itens da variável (Itens)
+        Dim Intervalo As Range 'Recebe os valores passados pela usuário
+        Dim Valor As Range 'Percorre o intervalo
+        
+        Dim Resp As Integer 'Guarda a resposrta do usuário caso tenha GU's
+        Dim Cancelar As Integer 'Para cancelar o processo
+        Dim Itens() As String 'Guarda os itens do GU's
+        Dim TemCodigo As Boolean 'Marca se tem código no GU's
+        
+        Dim TemGu As Boolean 'Verifica se a loja atual tem GU's
+        
+        Set Linhas = Tabela.ListRows 'Pega todas as linhas da tabela
+        
+        
+        'Pega a informação se há GU's------------------------------------------------------------------------------------------------------------------------
+        Resp = MsgBox("Existe Item(ns) do GU's?", vbYesNo, "GU's") 'Pergunta a existência de itens do GU's
+        
+        VerificadorGU = 0 'Segurança
+        
+        If Resp = vbYes Then
+            Do While Cancelar <> vbCancel 'Faz loop até o usuário cancelar
+                VerificadorGU = 1 'Inicializa variável do array
+                
+                    DoEvents
+                    
+                Application.ScreenUpdating = True 'Despausa a tela para pegar a informação
+                
+                On Error Resume Next 'Caso não tenha seleção
+                    Set Intervalo = Application.InputBox("Selecione o Intervalo de Células com os Códigos dos Produtos com GU's:", "Códigos GU's", Type:=8) 'Pede a seleção de intervalo na tabela
+                
+                Application.ScreenUpdating = False 'Pausa a tela novamente
+                
+                If Not Intervalo Is Nothing Then 'Caso tenha sido seleciondo algum intervalo
+                    
+                    For Each Valor In Intervalo 'Para cada célula
+                    
+                        If IsNumeric(Valor.Value2) And Len(Valor.Value2) = 7 Then 'Se for número e tiver 7 de tamanho
+                            ReDim Preserve Itens(1 To VerificadorGU) As String 'Aumenta a variável
+                            Itens(VerificadorGU) = Valor.Value2 'Acrescenta no array
+                            
+                            VerificadorGU = VerificadorGU + 1 'Incrementa o i
+                            TemCodigo = True 'Marca a existência de código
+                        End If
+                    Next Valor
+                    
+                    If Not TemCodigo Then
+                        Cancelar = MsgBox("Nenhum Código Encontrado no Intervalo!", vbOKCancel, "Não Encontrado") 'Sem Código
+                        
+                    Else 'Caso tenha código
+                        Exit Do 'Sai do loop
+                    End If
+                    
+                Else
+SemSelecao:
+                
+                    Cancelar = MsgBox("Nenhum Intervalo Selecionado", vbOKCancel, "Sem Intervalo") 'Sem intervalo
+                    
+                End If
+        
+            Loop
+        End If
+        '-------------------------------------------------------------------------------------------------------------------------------------------------
+        
+        If (Cancelar = vbCancel Or Resp = vbNo) And Not IsEmpty(Itens) Then 'Caso o usuário tenha cancelado ou não tenha itens do GU's e tiver algo na variável
+            VerificadorGU = 0
+            Erase Itens 'Limpa
+        End If
+        
+        
+        'Limpa erros------
+        Err.Clear
+        On Error GoTo 0
+        '-----------------
+        
+        
+        'Percorre todas as lojas da rede--------------------------------------------------------------------
+        For Each Linha In Linhas 'Para cada linha no conjunto de linhas
+            TemGu = False
+            
+            Loja = Intersect(Linha.Range, Tabela.ListColumns("Lojas").Range).Value2 'Pega o número da loja
+            
+            Loja = CStr(Loja) 'Transforma em string
+            
+            If Len(Loja) < 2 Then 'Caso tenha apenas 1 dígito
+                Loja = "0" & Loja 'Adiciona zero a frente
+            End If
+            
+            Loja = "Loja*" & Loja & "*" 'Configura forma de busca
+            
+            Set Cel = Plan.Cells.Find(Loja) 'Procura pela loja
+            
+            If Not Cel Is Nothing Then 'Caso ache
+                If Intersect(Linha.Range, Tabela.ListColumns("GU").Range).Value2 Like "Tem" Then 'Caso a loja atual tenha GU's
+                    TemGu = True 'Marca
+                End If
+                
+                Inicio = Cel.Row 'Recebe a linha inicial
+                
+                If Not Cel.Offset(1, 0).Value2 Like "" Then 'Caso não seja vazio a linha debaixo
+                    Fim = Cel.End(xlDown).Row 'Recebe a última linha
+                Else
+                    Fim = Cel.Row 'Senão recebe a mesma linha
+                End If
+                
+                'Percorre todos os itens da loja----------------------------------------------
+                For I = Inicio To Fim 'Percorre os produtos da loja
+                    If LCase(Plan.Cells(I, 5).Value2) Like "*resfriad?*" Then 'Caso tenha a palavra resfriado na descrição
+                        Carnes Linha, I 'Verifica a Carne
+                    End If
+                    
+                    If TemGu And VerificadorGU <> 0 Then 'Caso a loja tenha GU's e exista algum item do GU's
+                        For Prod = 1 To UBound(Itens)
+                            If Itens(Prod) Like Plan.Cells(I, 6) Then
+                                GU (I)
+                            End If
+                        Next Prod
+                    End If
+                Next I
+                '-----------------------------------------------------------------------------
+            End If
+        Next Linha
+        '-----------------------------------------------------------------------------------------------------------------------------
+    End If
+End Sub
+'--------------------------------------------------------------------------------------------------------
+
+'Adiciona legenda a planilha-----------------------------------------------
+Private Sub Legenda()
+     Plan.Cells(Plan.Rows.Count, 2).End(xlUp).Offset(2, 0).Select 'Seleciona a última linha da tabela
+     
+     'Vertical---------------------------------------------------------------
+     If TemVer Then
+        With ActiveCell
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .Interior.ColorIndex = 19 'Amarelo Claro
+        End With
+        
+        With ActiveCell.Offset(0, 1)
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .HorizontalAlignment = xlLeft 'Alinha a esquerda
+            .Font.Bold = True 'Negrito
+            .Font.ColorIndex = 3 'Vermelho
+            .Value2 = "Vertical" 'Valor
+        End With
+        
+        ActiveCell.Offset(1, 0).Select 'Passa para a próxima célula
+     End If
+     '---------------------------------------------------------------------------
+     'Horizontal---------------------------------------------------------------
+     If TemHor Then
+        With ActiveCell
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .Interior.ColorIndex = 45 'Laranja Claro
+        End With
+        
+        With ActiveCell.Offset(0, 1)
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .HorizontalAlignment = xlLeft 'Alinha a esquerda
+            .Font.Bold = True 'Negrito
+            .Font.ColorIndex = 3 'Vermelho
+            .Value2 = "Horizontal" 'Valor
+        End With
+        
+        ActiveCell.Offset(1, 0).Select 'Passa para a próxima célula
+     
+     End If
+     '-------------------------------------------------------------------------
+     
+     'Mesclado-----------------------------------------------------------------
+     If TemMesc Then
+        With ActiveCell
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .Interior.ColorIndex = 35 'Verde Claro
+        End With
+        
+        With ActiveCell.Offset(0, 1)
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .HorizontalAlignment = xlLeft 'Alinha a esquerda
+            .Font.Bold = True 'Negrito
+            .Font.ColorIndex = 3 'Vermelho
+            .Value2 = "Mesclado" 'Valor
+        End With
+        
+        ActiveCell.Offset(1, 0).Select 'Passa para a próxima célula
+     End If
+     '---------------------------------------------------------------------------
+     
+     If TemMania Then
+        With ActiveCell
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .Interior.ColorIndex = 24 'Azul Claro
+        End With
+        
+        With ActiveCell.Offset(0, 1)
+            .Borders.LineStyle = xlContinuous 'Adiciona borda
+            .HorizontalAlignment = xlLeft 'Alinha a esquerda
+            .Font.Bold = True 'Negrito
+            .Font.ColorIndex = 3 'Vermelho
+            .Value2 = "GU's" 'Valor
+        End With
+        
+        ActiveCell.Offset(1, 0).Select 'Passa para a próxima célula
+     End If
+     
+     Plan.Range("B3").Select 'Volta para o início
+
+End Sub
+'-------------------------------------------------------------------------
+
+'Termina a classe----------------------------------------------------
+Private Sub Class_Terminate()
+    
+    Legenda
+    
+    'Limpa as variáveis com informação-------------
+    If Not PastaRef Is Nothing Then
+        PastaRef.Close False
+        Set PastaRef = Nothing
+    End If
+    
+    If Not PlanRef Is Nothing Then
+        Set PlanRef = Nothing
+    End If
+    
+    If Not Tabela Is Nothing Then
+        Set Tabela = Nothing
+    End If
+    
+    If Not Plan Is Nothing Then
+        Set Plan = Nothing
+    End If
+    '----------------------------------------------
+    
+    With Application
+        .StatusBar = "" 'Retira informação da barra de status
+        .ScreenUpdating = True 'Despausa a tela
+    End With
+End Sub
+'----------------------------------------------------------------------
