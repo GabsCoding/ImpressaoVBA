@@ -1,0 +1,45 @@
+'Gera a tabela---------------------------------------------------------------------------
+Public Sub Gerar_Tabela()
+    Dim Plan As Worksheet
+    Dim Erro As Boolean
+    
+    Set Plan = ThisWorkbook.ActiveSheet 'Configura a planilha
+    
+    'Caso tenha dado a ser inserido--------------------------
+    On Error GoTo Fim
+    If Plan.Range("F2").Value Like "Código" Then
+        Plan.Cells.Range("J:BZ").Find("*").Select
+    Else
+        Plan.Cells.Find("*").Select
+    End If
+    On Error GoTo 0
+    '--------------------------------------------------------
+    
+    Dim Tabela As Criar_Tabela 'Cria a variável da classe
+    
+    Set Tabela = New Criar_Tabela 'Instancia o objeto
+    
+    Erro = Tabela.Encontrado 'Encontra a tabela no excel
+    
+    If Not Erro Then
+        MsgBox "Tabela não encontrada!", vbOKOnly, "Não encontrada!"
+        Exit Sub 'Sai da Sub
+    End If
+    
+    
+    Tabela.Visao_Loja
+    Tabela.Visao_Geral
+    
+       
+    Tabela.Extras
+    
+    Tabela.Colocar_Tabela 'Insere a tabela na posição
+    Tabela.Remove_Duplicados 'Remove dados duplicados
+    Tabela.Inserir_Evento 'Adiciona o evento a ser Utilizado
+    
+    Exit Sub 'Sai da execução
+    
+Fim: 'Senão acaba o processo
+    MsgBox "Tabela não encontrada!", vbOKOnly, "Não encontrada!"
+End Sub
+'--------------------------------------------------------------------------------------------------------------
