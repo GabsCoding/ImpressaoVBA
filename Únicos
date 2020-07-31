@@ -1,0 +1,13 @@
+'Chama as funções-------------------------------------
+Public Sub Marcar_Unicos()
+    Dim Marcar As Verificar_Tabela
+    
+    Application.ScreenUpdating = False
+    
+    Set Marcar = New Verificar_Tabela
+    
+    Marcar.Verificar
+    
+    Application.ScreenUpdating = True
+End Sub
+'------------------------------------------------------
