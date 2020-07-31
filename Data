@@ -1,0 +1,39 @@
+'Verifica a maior data dentro da tabela e retorna, caso não ache retorna vazio
+Public Function DataMaior() As Variant
+    Dim Data As Date 'Variável que guarda a data de Vigência
+    Dim Verif As Range 'Variável que percorre a data
+    Dim Plan As Worksheet 'Variável da planilha
+    Dim Texto As String 'Variável da procura
+    
+    Set Plan = ThisWorkbook.ActiveSheet
+    
+    Texto = "*?.*?.????" 'Procurando alguma data
+    
+    On Error GoTo SemData 'Caso não tenha
+        Plan.Cells.Find(Texto, LookAt:=xlWhole).Select
+    On Error GoTo 0
+    
+    Set Verif = ActiveCell 'Configura a vigência
+    Data = DateValue(Replace(Verif.Value, ".", "/")) 'Pega a data
+    
+    Do While Not Verif.Offset(1, 0).Value Like "" And Not Verif.Offset(2, 0).Value Like "" 'Percorre todo o espaço
+        If Not Verif.Value Like "" Then 'Se não for vazio
+            If DateValue(Replace(Verif.Value, ".", "/")) > Data Then 'Verifica se a data é maior
+                Data = DateValue(Replace(Verif.Value, ".", "/")) 'Pega a nova data
+            End If
+        End If
+        
+        Set Verif = Verif.Offset(1, 0) 'Passa para o próximo
+        
+        DoEvents
+        
+    Loop
+    
+    DataMaior = Data 'Retorna a data maior
+    
+    Exit Function 'Sai da função
+    
+SemData:
+    DataMaior = "" 'Retorna vazio
+    
+End Function
